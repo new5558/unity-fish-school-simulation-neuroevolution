@@ -99,8 +99,8 @@ class NumpyModel:
 			# inputs.append(input)
 
 			
-			input_layer = generate_layer(8, self.inputs_shape, self.inputs_shape, self.outputs_shape)
-			hidden_layer_1 = generate_layer(8, 8, self.inputs_shape, self.outputs_shape)
+			input_layer = generate_layer(16, self.inputs_shape, self.inputs_shape, self.outputs_shape)
+			hidden_layer_1 = generate_layer(8, 16, self.inputs_shape, self.outputs_shape)
 			hidden_layer_2 = generate_layer(4, 8, self.inputs_shape, self.outputs_shape)
 			output_layer = generate_layer(self.outputs_shape, 4, self.inputs_shape, self.outputs_shape)
 

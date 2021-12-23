@@ -8,18 +8,20 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-# from model import KerasModel as Model
-from model_new import NumpyModel as Model
+from model import KerasModel as Model
+# from model_new import NumpyModel as Model
 
 import sys
 
 def evaluate_fitness(fitnesses, best_number):
-  offset = 100
+  offset = 1
   arr = (fitnesses - fitnesses.min() + offset) / (fitnesses.max() - fitnesses.min() + offset)
   proba = arr / arr.sum()
   index = np.arange(len(fitnesses))
   # print(proba, 'proba')
   choice = np.random.choice(index , best_number, p=proba, replace=False)
+  # print(np.flip(np.argsort(fitnesses)), fitnesses[np.flip(np.argsort(fitnesses))], fitnesses[np.flip(np.argsort(fitnesses))][best_number:], 'fitnesses[np.argmax(fitnesses)]')
+  # choice = np.flip(np.argsort(fitnesses))[best_number:]
   return choice
   # return np.flip(np.argsort(fitnesses))
 
@@ -82,11 +84,12 @@ def init_env():
   seed = int(1000 * np.random.rand())
   env = UE(file_name='Fish Schooling Simulation 2D', seed=seed, side_channels=[channel])
 
-  channel.set_configuration_parameters(time_scale = 10.0)
+  channel.set_configuration_parameters(time_scale = 1.0)
 
   env.reset()
 
-  behavior_name = env.get_behavior_names()[0]
+  # behavior_name = env.get_behavior_names()[0]
+  behavior_name = "fish?team=0"
 
   spec = env.get_behavior_spec(behavior_name)
 
@@ -106,16 +109,17 @@ def main():
   print('start')
   save_weights = False
   population = 50
-  inputs_shape = 21
+  inputs_shape = 26 + 7
   outputs_shape = 2
-  # model = KerasModel(population, inputs_shape, outputs_shape, 'model_weights_backup/model-13')
-  model = Model(population, inputs_shape, outputs_shape)
+  model = Model(population, inputs_shape, outputs_shape, 'model_weights-obstacle-3-hidden/model-84')
+  # model = Model(population, inputs_shape, outputs_shape)
 
   env, behavior_name = init_env()
 
   decision_steps, terminal_steps = env.get_steps(behavior_name)
   
-  for episode in range(50):
+  fitnesses = np.full(population, 0)
+  for episode in range(102):
     print(episode, 'episode')
     
     env.reset()
@@ -124,7 +128,6 @@ def main():
     done = False # For the tracked_agent
 
     time_step = 0
-    fitnesses = np.full(population, 0)
     while not done:
       if tracked_agent == -1 and len(decision_steps) >= 1:
         tracked_agent = decision_steps.agent_id[0]
@@ -138,8 +141,11 @@ def main():
           observation = decision_steps.obs[0][i]
           y_positions.append(observation[4])
         # print(decision_steps.obs, 'decision_steps.obs')
+        # print(np.array(decision_steps.obs[0][0]), 'decision_steps.obs')
+        # print(np.array(decision_steps.obs[1]).shape, 'decision_steps.obs')
         # print(list(decision_steps.obs[0][0]), 'list(decision_steps.obs[0])')
-        action = model.generate_action(list(decision_steps.obs[0]))
+        observation_all = np.concatenate((decision_steps.obs[0], decision_steps.obs[1]), axis = 1)
+        action = model.generate_action(list(observation_all))
 
         env.set_actions(behavior_name, action) 
       # Move the simulation forward
@@ -148,29 +154,32 @@ def main():
       decision_steps, terminal_steps = env.get_steps(behavior_name)
 
 
-      finish_order = []
+      # finish_order = []
       for i in range(population):
-        reward = decision_steps[i].reward
+        # print(decision_steps[i], len(decision_steps), 'decision_steps[i]', i)
+        reward = decision_steps.reward[i]
         result = fitnesses[i] + reward
-        if i not in finish_order:
-          if result >= 5000:
-            fitnesses[i] = 5000 + (population - len(finish_order)) * 100
-            finish_order.append(i)
-          else:  
-            fitnesses[i] = result
-      if all(i >= 50 for i in y_positions) or time_step > 200:  # all agents terminated
+        # if i not in finish_order:
+        #   if result >= 5000:
+        #     fitnesses[i] = 5000 + (population - len(finish_order)) * 100
+        #     finish_order.append(i)
+        #   else:  
+        fitnesses[i] = result
+      if all(i >= 50 for i in y_positions) or time_step > 500:  # all agents terminated
           done = True
-          print(fitnesses, 'fitnesses')
-          print(np.mean(fitnesses), 'avg fitnesses')
-          print(np.std(fitnesses), 'std fitnesses')
-          best_ids = evaluate_fitness(fitnesses, 10)
+          if episode % 3 == 0 and episode != 0:
+            print(fitnesses, 'fitnesses')
+            print(np.mean(fitnesses), 'avg fitnesses')
+            print(np.std(fitnesses), 'std fitnesses')
+            best_ids = evaluate_fitness(fitnesses, 10)
 
-          if save_weights:
-            model.save_weights(f'model_weights/model-{episode}')
-            
-          weights = model.get_weights()
-          new_weights = cross_over(weights, best_ids, population)
-          model.set_weights(new_weights)
+            if save_weights:
+              model.save_weights(f'model_weights-obstacle-3-hidden/model-{episode}')
+              
+            weights = model.get_weights()
+            new_weights = cross_over(weights, best_ids, population)
+            model.set_weights(new_weights)
+            fitnesses = np.full(population, 0)
           
           # env.reset()
 
