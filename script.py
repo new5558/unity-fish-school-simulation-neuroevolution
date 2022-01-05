@@ -1,7 +1,21 @@
+# from mock_manager import SideChannelManager
+
+import uuid
+import struct
+
+from mlagents_envs.side_channel import IncomingMessage
+from mlagents_envs.exception import UnityEnvironmentException
+from mlagents_envs.logging_util import get_logger
+
+
+import sys
+sys.modules['mlagents_envs.side_channel.side_channel_manager'] = __import__('mock_manager')
+
 import mlagents
 from mlagents_envs.environment import UnityEnvironment as UE
 import numpy as np
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
+from mlagents_envs.base_env import ActionTuple 
 
 
 import numpy as np
@@ -11,7 +25,9 @@ from tensorflow.keras import layers
 from model import KerasModel as Model
 # from model_new import NumpyModel as Model
 
-import sys
+# import sys
+
+
 
 def evaluate_fitness(fitnesses, best_number):
   offset = 1
@@ -82,37 +98,41 @@ def init_env():
   channel = EngineConfigurationChannel()
 
   seed = int(1000 * np.random.rand())
-  env = UE(file_name='Fish Schooling Simulation 2D', seed=seed, side_channels=[channel])
+  # env = UE(file_name='Fish Schooling Simulation 2D', seed=seed, side_channels=[channel])
+  env = UE(file_name='Fish Schooling Simulation 2D', seed=seed)
 
-  channel.set_configuration_parameters(time_scale = 1.0)
+  channel.set_configuration_parameters(time_scale = 10.0)
 
   env.reset()
 
   # behavior_name = env.get_behavior_names()[0]
-  behavior_name = "fish?team=0"
+  # behavior_name = "fish?team=0"
+  behavior_name = "FishFoodCollector?team=0"
 
-  spec = env.get_behavior_spec(behavior_name)
+  # spec = env.get_behavior_spec(behavior_name)
 
-  print("Number of observations : ", len(spec.observation_shapes))
+  # print("Number of observations : ", len(spec.observation_shapes))
 
-  if spec.is_action_continuous():
-    print("The action is continuous")
+  # if spec.is_action_continuous():
+  #   print("The action is continuous")
 
-  if spec.is_action_discrete():
-    print("The action is discrete")
-
-  print(env.get_behavior_names(), behavior_name, 'name')
+  # if spec.is_action_discrete():
+  #   print("The action is discrete")
+  behavior_names = env.behavior_specs.keys()
+  for behavior in behavior_names:
+    print(behavior, 'behavior')
   return env, behavior_name
 
 
 def main():
   print('start')
-  save_weights = False
-  population = 50
-  inputs_shape = 26 + 7
+  save_weights = True
+  population = 32
+  # inputs_shape = 26 + 7
+  inputs_shape = 38
   outputs_shape = 2
-  model = Model(population, inputs_shape, outputs_shape, 'model_weights-obstacle-3-hidden/model-84')
-  # model = Model(population, inputs_shape, outputs_shape)
+  # model = Model(population, inputs_shape, outputs_shape, 'model_weights-obstacle-3-hidden/model-84')
+  model = Model(population, inputs_shape, outputs_shape)
 
   env, behavior_name = init_env()
 
@@ -138,6 +158,7 @@ def main():
       y_positions = []
       if len(decision_steps.agent_id) != 0:
         for i in range(population):
+          # print(np.array(decision_steps.obs).shape, 'decision_steps.obs')
           observation = decision_steps.obs[0][i]
           y_positions.append(observation[4])
         # print(decision_steps.obs, 'decision_steps.obs')
@@ -147,7 +168,9 @@ def main():
         observation_all = np.concatenate((decision_steps.obs[0], decision_steps.obs[1]), axis = 1)
         action = model.generate_action(list(observation_all))
 
-        env.set_actions(behavior_name, action) 
+        # print(behavior_name, action, 'behavior_name, action')
+        action_tuple = ActionTuple(continuous = action)
+        env.set_actions(behavior_name, action_tuple) 
       # Move the simulation forward
       env.step()
       # Get the new simulation results
@@ -155,16 +178,18 @@ def main():
 
 
       # finish_order = []
-      for i in range(population):
-        # print(decision_steps[i], len(decision_steps), 'decision_steps[i]', i)
-        reward = decision_steps.reward[i]
-        result = fitnesses[i] + reward
-        # if i not in finish_order:
-        #   if result >= 5000:
-        #     fitnesses[i] = 5000 + (population - len(finish_order)) * 100
-        #     finish_order.append(i)
-        #   else:  
-        fitnesses[i] = result
+      if len(decision_steps.reward) != 0:
+        for i in range(population):
+          # print(decision_steps[i], len(decision_steps), 'decision_steps[i]', i)
+          # print(decision_steps.reward, 'decision_steps.reward')
+          reward = decision_steps.reward[i]
+          result = fitnesses[i] + reward
+          # if i not in finish_order:
+          #   if result >= 5000:
+          #     fitnesses[i] = 5000 + (population - len(finish_order)) * 100
+          #     finish_order.append(i)
+          #   else:  
+          fitnesses[i] = result
       if all(i >= 50 for i in y_positions) or time_step > 500:  # all agents terminated
           done = True
           if episode % 3 == 0 and episode != 0:
@@ -174,14 +199,14 @@ def main():
             best_ids = evaluate_fitness(fitnesses, 10)
 
             if save_weights:
-              model.save_weights(f'model_weights-obstacle-3-hidden/model-{episode}')
+              model.save_weights(f'model_weights-new-env/model-{episode}')
               
             weights = model.get_weights()
             new_weights = cross_over(weights, best_ids, population)
             model.set_weights(new_weights)
             fitnesses = np.full(population, 0)
           
-          # env.reset()
+          env.reset()
 
 
 
