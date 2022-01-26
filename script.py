@@ -30,14 +30,14 @@ from model import KerasModel as Model
 
 
 def evaluate_fitness(fitnesses, best_number):
-  offset = 1
-  arr = (fitnesses - fitnesses.min() + offset) / (fitnesses.max() - fitnesses.min() + offset)
-  proba = arr / arr.sum()
-  index = np.arange(len(fitnesses))
+  # offset = 1
+  # arr = (fitnesses - fitnesses.min() + offset) / (fitnesses.max() - fitnesses.min() + offset)
+  # proba = arr / arr.sum()
+  # index = np.arange(len(fitnesses))
   # print(proba, 'proba')
-  choice = np.random.choice(index , best_number, p=proba, replace=False)
+  # choice = np.random.choice(index , best_number, p=proba, replace=False)
   # print(np.flip(np.argsort(fitnesses)), fitnesses[np.flip(np.argsort(fitnesses))], fitnesses[np.flip(np.argsort(fitnesses))][best_number:], 'fitnesses[np.argmax(fitnesses)]')
-  # choice = np.flip(np.argsort(fitnesses))[best_number:]
+  choice = np.flip(np.argsort(fitnesses))[best_number:]
   return choice
   # return np.flip(np.argsort(fitnesses))
 
@@ -98,10 +98,11 @@ def init_env():
   channel = EngineConfigurationChannel()
 
   seed = int(1000 * np.random.rand())
-  # env = UE(file_name='Fish Schooling Simulation 2D', seed=seed, side_channels=[channel])
-  env = UE(file_name='Fish Schooling Simulation 2D', seed=seed)
+  env = UE(file_name='Fish Schooling Simulation 2D', seed=seed, side_channels=[channel])
+  # env = UE(file_name='Fish Schooling Simulation 2D', seed=seed)
+  
+  channel.set_configuration_parameters(time_scale = 5.0)
 
-  channel.set_configuration_parameters(time_scale = 10.0)
 
   env.reset()
 
@@ -126,7 +127,7 @@ def init_env():
 
 def main():
   print('start')
-  save_weights = True
+  save_weights = False
   population = 32
   # inputs_shape = 26 + 7
   inputs_shape = 38
@@ -142,7 +143,7 @@ def main():
   for episode in range(102):
     print(episode, 'episode')
     
-    env.reset()
+    # env.reset()
     decision_steps, terminal_steps = env.get_steps(behavior_name)
     tracked_agent = -1 # -1 indicates not yet tracking
     done = False # For the tracked_agent
@@ -155,12 +156,12 @@ def main():
 
 
       # Set the actions
-      y_positions = []
+      # y_positions = []
       if len(decision_steps.agent_id) != 0:
-        for i in range(population):
-          # print(np.array(decision_steps.obs).shape, 'decision_steps.obs')
-          observation = decision_steps.obs[0][i]
-          y_positions.append(observation[4])
+        # for i in range(population):
+        #   # print(np.array(decision_steps.obs).shape, 'decision_steps.obs')
+        #   observation = decision_steps.obs[0][i]
+          # y_positions.append(observation[4])
         # print(decision_steps.obs, 'decision_steps.obs')
         # print(np.array(decision_steps.obs[0][0]), 'decision_steps.obs')
         # print(np.array(decision_steps.obs[1]).shape, 'decision_steps.obs')
@@ -183,20 +184,25 @@ def main():
           # print(decision_steps[i], len(decision_steps), 'decision_steps[i]', i)
           # print(decision_steps.reward, 'decision_steps.reward')
           reward = decision_steps.reward[i]
-          result = fitnesses[i] + reward
+          # print(reward, 'reward')
+          if reward <= -0.01:
+            result = fitnesses[i]
+          else:
+            result = fitnesses[i] + reward
           # if i not in finish_order:
           #   if result >= 5000:
           #     fitnesses[i] = 5000 + (population - len(finish_order)) * 100
           #     finish_order.append(i)
           #   else:  
           fitnesses[i] = result
-      if all(i >= 50 for i in y_positions) or time_step > 500:  # all agents terminated
+      if time_step > 500:  # all agents terminated
           done = True
+          env.reset()
           if episode % 3 == 0 and episode != 0:
             print(fitnesses, 'fitnesses')
             print(np.mean(fitnesses), 'avg fitnesses')
             print(np.std(fitnesses), 'std fitnesses')
-            best_ids = evaluate_fitness(fitnesses, 10)
+            best_ids = evaluate_fitness(fitnesses, 5)
 
             if save_weights:
               model.save_weights(f'model_weights-new-env/model-{episode}')
@@ -205,8 +211,6 @@ def main():
             new_weights = cross_over(weights, best_ids, population)
             model.set_weights(new_weights)
             fitnesses = np.full(population, 0)
-          
-          env.reset()
 
 
 

@@ -46,7 +46,7 @@ class KerasModel:
 			inputs.append(input)
 			x = layers.Dense(16, activation="tanh", bias_initializer='random_normal')(input)
 			x = layers.Dense(16, activation="tanh", bias_initializer='random_normal')(input)
-			x = layers.Dense(16, activation="tanh", bias_initializer='random_normal')(input)
+			x = layers.Dense(8, activation="relu", bias_initializer='random_normal')(input)
 			output = layers.Dense(self.outputs_shape, activation="tanh", bias_initializer='random_normal', name=f"output_{i + 1}")(x)
 			outputs.append(output)
 			# concatted = tf.keras.layers.Concatenate()(outputs)
